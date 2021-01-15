@@ -3,7 +3,7 @@
 #    ＊ モンスター図鑑
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.2
+#    バージョン ： 0.0.3
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -44,10 +44,10 @@ module MB
   ENTRY_LIST[:start]    = [:no, :defeat]
   # エンカウントで増やす項目
   ENTRY_LIST[:encount]  = [:graphic]
-  # 戦闘勝利で増やす項目
-  ENTRY_LIST[:winner]   = [:exp, :gold]
+  # 戦闘後に増やす項目
+  ENTRY_LIST[:battle]   = [:exp, :gold]
   # 解析で増やす項目
-  ENTRY_LIST[:analyze]  = [:status, :graphic, :exp, :gold, :drop]
+  ENTRY_LIST[:analyze]  = [:name, :status, :graphic, :exp, :gold, :drop]
   # 全表示項目 (完成度の判定に使用します。)
   ENTRY_LIST[:complete] = [
     :no, :name, :graphic, :comment,
@@ -55,7 +55,7 @@ module MB
   ]
   ENTRY_LIST["book"] = [:name, :graphic, :drop, :comment]
   ENTRY_LIST["WINNER"] =
-    [:name] + ENTRY_LIST[:start] + ENTRY_LIST[:encount] + ENTRY_LIST[:winner]
+    [:name] + ENTRY_LIST[:start] + ENTRY_LIST[:encount] + ENTRY_LIST[:battle]
   
   #--------------------------------------------------------------------------
   # ◇ 初期ページ
@@ -87,8 +87,8 @@ module MB
   AUTO_ENTRY_LOSE = false
   #--------------------------------------------------------------------------
   # ◇ 倒した敵のみ自動登録する
-  #     true  : 敵を倒すと閲覧レベル１
-  #     false : 遭遇でレベル１、倒すとレベル２
+  #     true  : 敵を倒すと :encount + :battle
+  #     false : 遭遇で :encount、倒すと :battle
   #--------------------------------------------------------------------------
   AUTO_ENTRY_DEFEATED = false
   
@@ -111,7 +111,11 @@ module MB
   #------------------------------------------------------------------------
   ICO_ELEMENT = [104, 105, 106, 107, 108, 109, 110, 111]
   
-  
+  #------------------------------------------------------------------------
+  # ◇ 戦闘時パーティコマンドに解析結果を追加する
+  #------------------------------------------------------------------------
+  PARTY_COMMAND = false
+
 end # module MB
 end # module CAO
 
@@ -163,22 +167,21 @@ module CAO::MB
     end
   end
 end
-class RPG::Enemy::DropItem
+class RPG::Enemy::DropItem # uniq 等のメソッドのために定義
   #--------------------------------------------------------------------------
-  # ●
+  # ● 同じアイテムなら常に同じハッシュ値を返し、種類がなしならば 0
   #--------------------------------------------------------------------------
   def hash
-    # 同じアイテムなら常に同じハッシュ値を返し、種類がなしならば 0
     @kind * 13 + @data_id * 31 * @kind
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 内容が等しければ true
   #--------------------------------------------------------------------------
   def ==(other)
     self.hash == other.hash
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 内容が等しければ true
   #--------------------------------------------------------------------------
   def eql?(other)
     self == other
@@ -236,24 +239,19 @@ class << BattleManager
   def battle_end(result)
     if CAO::MB::AUTO_ENTRY_LOSE || result != 2
       $game_troop.members.each do |e|
-        enemy = $game_mbook.enemy(e.enemy_id)
-        next if enemy.nil?
-        enemy.defeat += 1 if e.dead?        # 倒した数を増加
-        enemy.encount = true                # 遭遇済み
-        enemy.add(:encount)
-        enemy.add(:winner) if !CAO::MB::AUTO_ENTRY_DEFEATED || e.dead?
+        $game_mbook.enemy(e.enemy_id) do |dt|
+          next if e.hidden?
+          next if CAO::MB::AUTO_ENTRY_DEFEATED && e.alive?
+          dt.encount = true
+          dt.add(:encount)
+          if e.dead?
+            dt.defeat += 1
+            dt.add(:battle)
+          end
+        end
       end
     end
     _cao_mbook_battle_end(result)
-  end
-  #--------------------------------------------------------------------------
-  # ● アナライズの実行
-  #     target : 解析対象
-  #--------------------------------------------------------------------------
-  def execute_analyze(target)
-    return unless target.is_a?(Game_Enemy)
-    return unless target.state?(CAO::MB::ID_ANALYZE)
-    $game_mbook.enemy(target.enemy_id).add(:analyze)
   end
 end
 class Game_Enemy < Game_Battler
@@ -272,15 +270,28 @@ class Game_Enemy < Game_Battler
     mbk_enemy.drop_items.uniq! if mbk_enemy
     return result
   end
-end
-class Window_BattleLog < Window_Selectable
   #--------------------------------------------------------------------------
-  # ○ 行動結果の表示
+  # ○ ステートの付加
   #--------------------------------------------------------------------------
-  alias _cao_mbook_display_action_results display_action_results
-  def display_action_results(target, item)
-    _cao_mbook_display_action_results(target, item)
-    BattleManager.execute_analyze(target)
+  alias _cao_mbook_add_state add_state
+  def add_state(state_id)
+    if state_id == CAO::MB::ID_ANALYZE
+      return unless analyze_addable?(state_id)
+      $game_mbook.enemy(enemy_id) {|dt| dt.add(:analyze) }
+    else
+      _cao_mbook_add_state(state_id)
+    end
+  end
+  #--------------------------------------------------------------------------
+  # ● 解析ステートの付加判定
+  #--------------------------------------------------------------------------
+  def analyze_addable?(state_id)
+    return false if state_id != CAO::MB::ID_ANALYZE
+    return false unless $data_states[state_id]
+    return false if state_resist?(state_id)
+    return false if state_removed?(state_id)
+    return false if state_restrict?(state_id)
+    return true
   end
 end
 class Game_Interpreter
@@ -354,7 +365,7 @@ class Game_MonsterBookData
     @secret = /^@MB_SECRET/ === self.note
   end
   #--------------------------------------------------------------------------
-  # ● 図鑑を完成させる
+  # ● 項目を完成させる
   #--------------------------------------------------------------------------
   def complete
     @entry = CAO::MB::ENTRY_LIST[:complete].dup
@@ -362,7 +373,7 @@ class Game_MonsterBookData
     @secret = false
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 項目の完成度を取得
   #--------------------------------------------------------------------------
   def complete_rate
     return [
@@ -371,27 +382,27 @@ class Game_MonsterBookData
     ]
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● ドロップアイテムの取得
   #--------------------------------------------------------------------------
   def enemy_drop_items
     self.data.drop_items.select {|a| a.kind != 0 }
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 非表示設定の変更
   #--------------------------------------------------------------------------
   def secret=(v)
     @unread = true if @secret && !v
     @secret = v
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 登録情報の変更
   #--------------------------------------------------------------------------
   def set(params)
     @entry.replace(CAO::MB::ENTRY_LIST[params] || params)
     @unread = true
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 登録情報の追加
   #--------------------------------------------------------------------------
   def add(params)
     new_entry = @entry | (CAO::MB::ENTRY_LIST[params] || params)
@@ -401,13 +412,13 @@ class Game_MonsterBookData
     end
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 登録情報の削除
   #--------------------------------------------------------------------------
   def del(parms)
     @entry -= CAO::MB::ENTRY_LIST[params] || params
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 既読にする
   #--------------------------------------------------------------------------
   def read
     @unread = false if @unread && self.entry?
@@ -453,7 +464,7 @@ class Game_MonsterBookData
     return self.data.name
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● パラメータの取得
   #--------------------------------------------------------------------------
   def hp
     return self.data.params[0]
@@ -489,23 +500,17 @@ class Game_MonsterBookData
   # ● コメントの取得
   #--------------------------------------------------------------------------
   def comments
-    if @comments == nil
-      @comments = []
-      ary = self.note.split("\r\n")
-      si = ary.index("@MB_COMMENT")
-      if si
-        ary =  ary[si+1, ary.size - si+1]
-        while s = ary.shift
-          if s[/(.*?)@\s*$/]
-            @comments << $1
-            break
-          else
-            @comments << s
-          end
-        end
-      end
+    @comments ||= make_comments
+  end
+  def make_comments
+    prev,sep,foll = self.note.partition("@MB_COMMENT")
+    if sep.empty?
+      return []
+    else
+      prev,sep,foll = foll.strip.rpartition("@")
+      text = (sep.empty? ? foll : prev).rstrip
+      return text.split("\r\n")
     end
-    return @comments
   end
   #--------------------------------------------------------------------------
   # ● メモの取得
@@ -554,10 +559,13 @@ class Game_MonsterBook
   end
   #--------------------------------------------------------------------------
   # ● エネミー ID から図鑑情報を取得
+  #     &block: 除外されていなければ図鑑情報を引数にブロックの内容を実行
   #--------------------------------------------------------------------------
   def enemy(enemy_id)
     enemy_id = @replacement[enemy_id] || enemy_id
-    return @data.detect {|e| e && enemy_id == e.enemy_id }
+    book_data = @data.find {|e| e && enemy_id == e.enemy_id }
+    yield book_data if block_given? && book_data
+    return book_data
   end
   #--------------------------------------------------------------------------
   # ● エネミー ID から図鑑情報を取得
@@ -591,7 +599,6 @@ class Game_MonsterBook
     @replacement = {}
     $data_enemies.each do |enemy|
       next if !enemy
-#~       next if enemy.note[/^@MB_DESELECTION/i]
       if enemy.note[/^@MB_DESELECTION\s?(\d+)?/i]
         @replacement[enemy.id] = $1.to_i
       else
@@ -620,7 +627,7 @@ class Game_MonsterBook
     self.each {|e| e.complete }
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● イテレータの定義
   #--------------------------------------------------------------------------
   def each
     self.data.each {|e| yield e }
@@ -664,7 +671,7 @@ class Game_MonsterBook
     return self.select {|e| e.encount }.size
   end
   #--------------------------------------------------------------------------
-  # ● 図鑑の完成度の取得
+  # ● 図鑑の完成度の取得 (0.0 - 1.0)
   #--------------------------------------------------------------------------
   def complete_rate
     total = 0
@@ -674,24 +681,10 @@ class Game_MonsterBook
       total += max
       count += now
     end
-    return (count/total.to_f)# * 100
-    if CAO::MB::COMPRATE_AVERAGE
-      count = 0.0
-      self.each do |e|
-        next if e.secret
-        count += e.entry.size
-        if CAO::MB::AUTO_ENTRY_DROP && e.drop_item_max != 0
-          count -= 1
-          count += e.drop_items.select {|r| r }.size / e.drop_item_max
-        end
-      end
-      return Integer(count / CAO::MB::ENTRY_COMPLETE.size * 100 / self.size)
-    else
-      return completion_count * 100 / self.size
-    end
+    return count.fdiv(total)
   end
   #--------------------------------------------------------------------------
-  # ● 遭遇した種類を百分率で取得
+  # ● 遭遇した種類を百分率で取得 (0 - 100)
   #--------------------------------------------------------------------------
   def encount_rate
     return encount_count * 100 / self.size
@@ -747,12 +740,13 @@ class Window_MonsterBookCommand < Window_Selectable
   # ● アイテムリストの作成
   #--------------------------------------------------------------------------
   def make_item_list
-    if SceneManager.scene_is?(Scene_Battle)
-      @data = $game_mbook.enemies($game_troop.members.map(&:enemy_id))
-    else
-      @data = $game_mbook.data
-    end
-#~     @data = $game_mbook[].compact#.map {|data| data.name }
+    @data =
+      if SceneManager.scene_is?(Scene_Battle)
+        list_id = $game_troop.members.select(&:exist?).map(&:enemy_id)
+        $game_mbook.enemies(list_id)
+      else
+        $game_mbook.data
+      end
   end
   #--------------------------------------------------------------------------
   # ● 項目の描画
@@ -765,10 +759,8 @@ class Window_MonsterBookCommand < Window_Selectable
     if enemy.entry?
       change_color(enemy.unread ? text_color(11) : normal_color)
       if enemy.enable?(:name)
-#~         change_color(enemy.unread ? text_color(11) : normal_color)
         draw_text(rect, enemy.name)
       else
-#~         change_color(normal_color)
         draw_text(rect, "？？？？？？？", 1)
       end
     else
@@ -825,6 +817,9 @@ class Window_MonsterBookCommand < Window_Selectable
   end
 end
 class Window_MonsterBookStatus < Window_Base
+  #--------------------------------------------------------------------------
+  # ● 定数
+  #--------------------------------------------------------------------------
   KEY_STATUS = [:hp, :mp, :atk, :def, :mat, :mdf, :age, :luk]
   COL_IMGBACK = Color.new(0, 0, 0, 128)
   ICO_EMPTY = 16
@@ -834,7 +829,6 @@ class Window_MonsterBookStatus < Window_Base
   def initialize(x, y)
     super(x, y, 360, Graphics.height)
     @page_index = CAO::MB::START_PAGE
-#~     refresh
   end
   #--------------------------------------------------------------------------
   # ● の設定
@@ -844,7 +838,7 @@ class Window_MonsterBookStatus < Window_Base
     refresh
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● ウィンドウ内容の幅を計算
   #--------------------------------------------------------------------------
   def contents_width
     page_width * page_max
@@ -868,19 +862,19 @@ class Window_MonsterBookStatus < Window_Base
     return width - standard_padding * 2
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 最大ページ数
   #--------------------------------------------------------------------------
   def page_max
     return CAO::MB::STATUS.size
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 行位置のリセット
   #--------------------------------------------------------------------------
   def reset_line
     @y = 0
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 行を進める
   #--------------------------------------------------------------------------
   def step_line(v = nil)
     now = @y
@@ -888,17 +882,9 @@ class Window_MonsterBookStatus < Window_Base
     return now
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 表示ページの設定
   #--------------------------------------------------------------------------
-#~   def read_page
-#~     return if @enemy.secret
-#~     return if @enemy.entry.empty?
-#~     @enemy.unread = false
-#~   end
   attr_reader :page_index
-  #--------------------------------------------------------------------------
-  # ●
-  #--------------------------------------------------------------------------
   def page_index=(index)
     last_index = @page_index
     @page_index = [0, [index, page_max - 1].min].max
@@ -911,10 +897,10 @@ class Window_MonsterBookStatus < Window_Base
   def refresh
     contents.clear
     draw_page(@page_index)
-    @enemy.read#read_page
+    @enemy.read
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● ページの描画
   #--------------------------------------------------------------------------
   def draw_page(index)
     reset_line
@@ -945,10 +931,8 @@ class Window_MonsterBookStatus < Window_Base
   # ●
   #--------------------------------------------------------------------------
   def default_position(x, y, width, height, option={})
-    x      ||= 0
-    y      ||= option[:nobr] ? @y : step_line
-#~     width  ||= page_width - x
-#~     height ||= line_height
+    x    ||= 0
+    y    ||= option[:nobr] ? @y : step_line
     width  = page_width - x if (width  || 0) == 0
     height = line_height    if (height || 0) == 0
     align  = option[:align] || 0
@@ -1177,7 +1161,6 @@ class Window_MonsterBookStatus < Window_Base
   def draw_graphic(x, y, width, height, option, enabled)
     x, y, width, height = default_position(x, y||@y, width, height)
     rect = Rect.new(x, y, width, height)
-#~     rect.width = page_width if page_width < rect.width
     bitmap = @enemy.bitmap
     if enabled
       if rect.width < bitmap.width
@@ -1196,7 +1179,6 @@ class Window_MonsterBookStatus < Window_Base
       rect.y += (height - rect.height) / 2
       contents.stretch_blt(rect, bitmap, bitmap.rect)
     else
-#~       rect = Rect.new(x, y, width, height)
       contents.fill_rect(rect, COL_IMGBACK)
       contents.draw_text(rect, "？", 1)
     end
@@ -1372,7 +1354,7 @@ class Window_MonsterBookInfo < Window_Base
     line_number * line_height + standard_padding * 2
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● リフレッシュ
   #--------------------------------------------------------------------------
   def refresh
     if line_height < contents.height
@@ -1569,3 +1551,64 @@ class Scene_MonsterBook < Scene_MenuBase
     end
   end
 end
+if CAO::MB::PARTY_COMMAND
+class Window_PartyCommand < Window_Command
+  #--------------------------------------------------------------------------
+  # ● コマンドリストの作成
+  #--------------------------------------------------------------------------
+  alias _cao_mbook_make_command_list make_command_list
+  def make_command_list
+    _cao_mbook_make_command_list
+    @list << @list.pop.tap { add_command("解析結果", :analyze) }
+  end
+end
+class Scene_Battle < Scene_Base
+  #--------------------------------------------------------------------------
+  # ● 全ウィンドウの作成
+  #--------------------------------------------------------------------------
+  alias _cao_mbook_create_all_windows create_all_windows
+  def create_all_windows
+    _cao_mbook_create_all_windows
+    create_mbook_window
+  end
+  #--------------------------------------------------------------------------
+  # ● ウィンドウの作成
+  #--------------------------------------------------------------------------
+  def create_mbook_window
+    @mbook_command_window = Window_MonsterBookCommand.new
+    @mbook_command_window.set_handler(:cancel, method(:mbook_cancel))
+    @mbook_status_window =
+      Window_MonsterBookStatus.new(@mbook_command_window.width, 0)
+    @mbook_command_window.status_window = @mbook_status_window
+    @mbook_command_window.deactivate
+    @mbook_command_window.openness = 0
+    @mbook_status_window.deactivate
+    @mbook_status_window.openness = 0
+  end
+  #--------------------------------------------------------------------------
+  # ● パーティコマンドウィンドウの作成
+  #--------------------------------------------------------------------------
+  alias _cao_mbook_create_party_command_window create_party_command_window
+  def create_party_command_window
+    _cao_mbook_create_party_command_window
+    @party_command_window.set_handler(:analyze, method(:command_analyze))
+  end
+  #--------------------------------------------------------------------------
+  # ● コマンド［解析］
+  #--------------------------------------------------------------------------
+  def command_analyze
+    @party_command_window.deactivate
+    @mbook_command_window.refresh
+    @mbook_command_window.activate.open
+    @mbook_status_window.open
+  end
+  #--------------------------------------------------------------------------
+  # ● コマンド［］
+  #--------------------------------------------------------------------------
+  def mbook_cancel
+    @party_command_window.activate
+    @mbook_command_window.deactivate.close
+    @mbook_status_window.close
+  end
+end
+end # if
