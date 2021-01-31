@@ -3,7 +3,7 @@
 #    ＊ 共有マクロ
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.0.0
+#    バージョン ： 1.0.1
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -419,7 +419,7 @@ module CAO::MACRO
     #------------------------------------------------------------------------
     def visible_line_number
       num = (Graphics.height - standard_padding * 2) / line_height
-      num = item_max / col_max if item_max / col_max < num
+      num = (item_max + col_max - 1) / col_max if item_max / col_max < num
       num
     end
     #------------------------------------------------------------------------
