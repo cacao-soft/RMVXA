@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 選択肢の表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.1
+#    バージョン ： 0.0.2
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -155,18 +155,23 @@ class Window_ChoiceList < Window_Command
     self.width = window_width
     self.height = window_height
     if @message_window.open?
+      if @message_window.y >= Graphics.height / 2
+        self.y = @message_window.y - height
+      else
+        self.y = @message_window.y + @message_window.height
+      end
       case window_position
       when 0  # 左
         self.x = 0
       when 1  # 中央
         self.x = (Graphics.width - width) / 2
+        if self.y < @message_window.y
+          self.y = (self.y + 1) / 2
+        else
+          self.y += (Graphics.height - self.y - height) / 2
+        end
       else    # 右
         self.x = Graphics.width - width
-      end
-      if @message_window.y >= Graphics.height / 2
-        self.y = @message_window.y - height
-      else
-        self.y = @message_window.y + @message_window.height
       end
     else
       self.x = (Graphics.width - width) / 2
