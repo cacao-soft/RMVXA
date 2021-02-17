@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 選択肢の表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.2
+#    バージョン ： 0.0.3
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -48,31 +48,40 @@ module CLEX
   #--------------------------------------------------------------------------
   # ◇ 選択肢の処理
   #--------------------------------------------------------------------------
-  CHOICES_PROC = {}   # nil と "" 禁止
+  CHOICES_PROC = {} # nil と "" 禁止
   
   # 項目名
-  CHOICES_PROC["＃パーティ"] = -> { $game_party.members.map!(&:name) }
-  CHOICES_PROC["＃アクター"] = -> { $data_actors.compact.map!(&:name) }
-  CHOICES_PROC["＃道具"] = -> { $data_items.compact.map!(&:name) }
-  CHOICES_PROC["＃武器"] = -> { $data_weapons.compact.map!(&:name) }
-  CHOICES_PROC["＃防具"] = -> { $data_armors.compact.map!(&:name) }
+  CHOICES_PROC["＃パーティ"] = -> { $game_party.all_members.map!(&:name) }
+  CHOICES_PROC["＃戦闘員"] = -> { $game_party.battle_members.map!(&:name) }
+  CHOICES_PROC["＃アクター"] = -> { commands($data_actors, :name) }
+  CHOICES_PROC["＃道具"] = -> { commands($data_items, :name) }
+  CHOICES_PROC["＃武器"] = -> { commands($data_weapons, :name) }
+  CHOICES_PROC["＃防具"] = -> { commands($data_armors, :name) }
+  CHOICES_PROC["＃装飾"] =
+    -> { commands($data_armors, :name) {|a| a.etype_id == 4 } }
+  CHOICES_PROC["＃装備"] =
+    -> { commands([*$data_weapons, *$data_armors], :name) }
   CHOICES_PROC["＃アイテム"] =
-    -> { [*$data_items, *$data_weapons, *$data_armors].compact.map!(&:name) }
+    -> { commands([*$data_items, *$data_weapons, *$data_armors], :name) }
+  CHOICES_PROC["＃スキル"] = -> { commands($data_skills, :name) }
+  
   CHOICES_PROC["three"] = -> { %w[キャラＡ キャラＢ キャラＣ] }
   
-  # 決定
-  CHOICES_PROC["default_decide"] = -> x { $game_variables[8] = x }
-  CHOICES_PROC["＆項目名"] =
-    -> x { $game_variables[8] = $game_message.choices[x] }
+  # 決定 (デフォルト動作: default_decide 削除不可)
+  CHOICES_PROC["default_decide"] = -> i { $game_variables[8] = i }
+  CHOICES_PROC["＆項目名"] = -> i { $game_variables[8] = commands[i] }
   
   # 選択更新
-  CHOICES_PROC["＆更新"] = -> x {
-    $game_map.screen.pictures.each do |pic|
-      next if pic.number < 4
-      break if 6 < pic.number
-      pic.instance_variable_set(:@opacity,pic.number == x + 4 ? 255 : 0)
-    end
+  CHOICES_PROC["＆更新"] = -> i { change_picture_opacity(i, 4, 6) }
+  
+  CHOICES_PROC["actor"] = {
+    data: -> { $game_actors.instance_eval{@data}.compact },
+    name: -> x,i { x.name },
+    cond: -> x,i { x.hp != x.mhp },
+    update: -> i { print "\r#{i}     " },
+    decide: -> i { puts DATA(i).name }
   }
+  
 end # module CLEX
 end # module CAO
 
@@ -84,49 +93,88 @@ end # module CAO
 #/////////////////////////////////////////////////////////////////////////////#
 
 
+class << CAO::CLEX
+  def DATA(index)
+    $game_message.choice_parameters[:data][index]
+  end
+  def commands(data = nil, property_name = nil, &block)
+    list = (data||$game_message.choices).compact
+    list.select!(&block) if block
+    list.map!(&property_name).to_a
+  end
+  def change_picture_opacity(i, s_num, e_num)
+    $game_map.screen.pictures.each do |pic|
+      next unless (pic.number == s_num)..(pic.number == e_num)
+      pic.instance_variable_set(:@opacity, pic.number == i + s_num ? 255 : 0)
+    end
+  end
+end
 class Game_Message
   #--------------------------------------------------------------------------
   # ● 公開インスタンス変数
   #--------------------------------------------------------------------------
-  attr_accessor :choice_update      # 選択肢 選択中処理
-  attr_accessor :choice_options     # 選択肢 オプション
+  attr_accessor :choice_parameters  # 選択肢 拡張パラメータ
   #--------------------------------------------------------------------------
   # ● クリア
   #--------------------------------------------------------------------------
   alias _cao_choice_clear clear
   def clear
     _cao_choice_clear
-    @choice_update = nil
-    @choice_options = {}
+    @choice_parameters = {}
   end
 end
 class Game_Interpreter
+  def setup_choices_ex(key, cancel_type, options)
+    gmcp = $game_message.choice_parameters
+    # [決定,更新]
+    choice_decide, choice_update = options[0].to_s[/^\[(.+?)\]$/,1].tap {|s|
+      break unless s
+      options.shift
+      break s.split(",").map {|k| CAO::CLEX::CHOICES_PROC[k.strip] }
+    }
+    gmcp[:options] = options.each_with_object({}) {|x,r| r[x] = !x.empty? }
+    params = CAO::CLEX::CHOICES_PROC[key]
+    case params
+    when nil
+      return false
+    when Hash
+      data = []
+      commands = []
+      (params[:data] && params[:data].call || []).each_with_index do |dt,i|
+        next if params[:cond] && !params[:cond].call(dt, i)
+        data.push(dt)
+        commands.push(params[:name] ? params[:name].call(dt, i) : dt)
+      end
+      choice_decide ||= params[:decide]
+      choice_update ||= params[:update]
+    else
+      commands = CAO::CLEX::CHOICES_PROC[key].call
+      data = commands
+    end
+    choice_decide ||= CAO::CLEX::CHOICES_PROC["default_decide"]
+    gmcp[:data] = data
+    gmcp[:commands] = commands
+    gmcp[:update] = choice_update
+    $game_message.choices.replace(commands)
+    $game_message.choice_cancel_type =
+      cancel_type == 5 ? commands.size + 1 : 0
+    $game_message.choice_proc = Proc.new do |n|
+      if n == $game_message.choice_cancel_type - 1
+        @branch[@indent] = 4  # キャンセル
+      else
+        @branch[@indent] = 0  # 決定
+        choice_decide.call(n)
+      end
+    end
+    return true
+  end
   #--------------------------------------------------------------------------
   # ● 選択肢のセットアップ
   #--------------------------------------------------------------------------
   def setup_choices(params)
     commands, cancel_type = params[0].dup, params[1]
     key, *opts = commands[0].split(";").map!(&:strip)
-    cccp = CAO::CLEX::CHOICES_PROC
-    $game_message.choice_options =
-      opts.each_with_object({}) {|x,r| r[x] = !x.empty?  }
-    if cccp.has_key?(key)
-      $game_message.choices.replace(cccp[key].call)
-      cancel_type = params[1] == 5 ? $game_message.choices.size + 1 : 0
-      $game_message.choice_cancel_type = cancel_type
-      decide,selection =
-        opts[0] && opts[0][/^\[(.+?)\]$/,1].tap {|s| break s.split(",") if s }
-      $game_message.choice_update = cccp[selection]
-      choice_decide = cccp[decide] || cccp["default_decide"]
-      $game_message.choice_proc = Proc.new do |n|
-        if n == cancel_type - 1
-          @branch[@indent] = 4  # キャンセル
-        else
-          @branch[@indent] = 0  # 決定
-          choice_decide.call(n)
-        end
-      end
-    else
+    unless setup_choices_ex(key, cancel_type, opts)
       commands[0] = commands[0].split(";")[0]  # オプション部分を削除
       commands.each {|s| $game_message.choices.push(s) }
       $game_message.choice_cancel_type = cancel_type
@@ -190,9 +238,10 @@ class Window_ChoiceList < Window_Command
   # ● ウィンドウ位置
   #--------------------------------------------------------------------------
   def window_position
-    gmco = $game_message.choice_options
-    return 0 if gmco["left"] || gmco["左"]
-    return 1 if gmco["center"] || gmco["中央"]
+    opts = $game_message.choice_parameters[:options]
+    return 2 unless opts
+    return 0 if opts["left"]   || opts["左"]
+    return 1 if opts["center"] || opts["中央"]
     return 2
   end
   #--------------------------------------------------------------------------
@@ -228,8 +277,8 @@ class Window_ChoiceList < Window_Command
   # ● 桁数の取得
   #--------------------------------------------------------------------------
   def col_max
-    gmco = $game_message.choice_options
-    return 2 if gmco["2col"] || gmco["２列"]
+    opts = $game_message.choice_parameters[:options]
+    return 2 if opts && (opts["2col"] || opts["２列"])
     return 1
   end
   #--------------------------------------------------------------------------
@@ -252,6 +301,6 @@ class Window_ChoiceList < Window_Command
   #--------------------------------------------------------------------------
   def update_cursor
     super
-    $game_message.choice_update === index
+    $game_message.choice_parameters[:update] === index
   end
 end
