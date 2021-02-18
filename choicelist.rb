@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 選択肢の表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.3
+#    バージョン ： 0.0.4
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -46,6 +46,10 @@
 module CAO
 module CLEX
   #--------------------------------------------------------------------------
+  # ◇ 選択したインデックスを入れるＥＶ変数の番号 (決定時のデフォルト動作)
+  #--------------------------------------------------------------------------
+  VARID = 8
+  #--------------------------------------------------------------------------
   # ◇ 選択肢の処理
   #--------------------------------------------------------------------------
   CHOICES_PROC = {} # nil と "" 禁止
@@ -67,16 +71,16 @@ module CLEX
   
   CHOICES_PROC["three"] = -> { %w[キャラＡ キャラＢ キャラＣ] }
   
-  # 決定 (デフォルト動作: default_decide 削除不可)
-  CHOICES_PROC["default_decide"] = -> i { $game_variables[8] = i }
+  # 決定
   CHOICES_PROC["＆項目名"] = -> i { $game_variables[8] = commands[i] }
+  CHOICES_PROC["＄アクター"] = -> i { $game_variables[9] = i }
   
   # 選択更新
   CHOICES_PROC["＆更新"] = -> i { change_picture_opacity(i, 4, 6) }
   
   CHOICES_PROC["actor"] = {
     data: -> { $game_actors.instance_eval{@data}.compact },
-    name: -> x,i { x.name },
+    name: -> x,i { "%02d %s (HP%4d)" % [i, just(x.name,6,"　"), x.hp] },
     cond: -> x,i { x.hp != x.mhp },
     update: -> i { print "\r#{i}     " },
     decide: -> i { puts DATA(i).name }
@@ -102,6 +106,12 @@ class << CAO::CLEX
     list.select!(&block) if block
     list.map!(&property_name).to_a
   end
+  def just(str, width, padding = " ")
+    char_size = padding.bytesize == 1 ? 1 : 2
+    str_width = str.to_s.chars.inject(0) {|r,s| r + (s.bytesize == 1 ? 1 : 2) }
+    padding *= (width.abs * char_size - str_width) / char_size
+    width < 0 ? "#{str}#{padding}" : "#{padding}#{str}"
+  end
   def change_picture_opacity(i, s_num, e_num)
     $game_map.screen.pictures.each do |pic|
       next unless (pic.number == s_num)..(pic.number == e_num)
@@ -126,13 +136,20 @@ end
 class Game_Interpreter
   def setup_choices_ex(key, cancel_type, options)
     gmcp = $game_message.choice_parameters
-    # [決定,更新]
-    choice_decide, choice_update = options[0].to_s[/^\[(.+?)\]$/,1].tap {|s|
-      break unless s
-      options.shift
-      break s.split(",").map {|k| CAO::CLEX::CHOICES_PROC[k.strip] }
-    }
-    gmcp[:options] = options.each_with_object({}) {|x,r| r[x] = !x.empty? }
+    gmcp[:options] = {}
+    variable_id = CAO::CLEX::VARID
+    options.each do |opt|
+      case opt
+      when ''
+      when /^(\d+)$/      # 結果代入先
+        variable_id = $1.to_i
+      when /^\[(.+?)\]$/  # [決定,更新]
+        choice_decide, choice_update =
+          $1.split(",").map {|k| CAO::CLEX::CHOICES_PROC[k.strip] }
+      else
+        gmcp[:options][opt] = true
+      end
+    end
     params = CAO::CLEX::CHOICES_PROC[key]
     case params
     when nil
@@ -151,7 +168,7 @@ class Game_Interpreter
       commands = CAO::CLEX::CHOICES_PROC[key].call
       data = commands
     end
-    choice_decide ||= CAO::CLEX::CHOICES_PROC["default_decide"]
+    choice_decide ||= -> i { $game_variables[variable_id] = i }
     gmcp[:data] = data
     gmcp[:commands] = commands
     gmcp[:update] = choice_update
