@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 選択肢の表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.4
+#    バージョン ： 0.0.5
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -35,6 +35,9 @@
 #
 #     ○ 項目の２列表示
 #      選択肢１に ;2col もしくは ;２列 を追記する。
+#
+#     ○ 項目選択時に結果を代入するＥＶ変数の番号
+#      選択肢１に ;1 のように数値のみを追加します。
 #
 #
 #******************************************************************************
@@ -68,22 +71,26 @@ module CLEX
   CHOICES_PROC["＃アイテム"] =
     -> { commands([*$data_items, *$data_weapons, *$data_armors], :name) }
   CHOICES_PROC["＃スキル"] = -> { commands($data_skills, :name) }
-  
+  CHOICES_PROC["＃クラス"] = -> { commands($data_classes, :name) }
+  CHOICES_PROC["＃エネミー"] = -> { commands($data_enemies, :name) }
+  CHOICES_PROC["＃グループ"] = -> { commands($data_troops, :name) }
+  CHOICES_PROC["＃ステート"] = -> { commands($data_states, :name) }
+
   CHOICES_PROC["three"] = -> { %w[キャラＡ キャラＢ キャラＣ] }
   
   # 決定
   CHOICES_PROC["＆項目名"] = -> i { $game_variables[8] = commands[i] }
-  CHOICES_PROC["＄アクター"] = -> i { $game_variables[9] = i }
   
   # 選択更新
   CHOICES_PROC["＆更新"] = -> i { change_picture_opacity(i, 4, 6) }
   
+  # まとめて設定
   CHOICES_PROC["actor"] = {
     data: -> { $game_actors.instance_eval{@data}.compact },
-    name: -> x,i { "%02d %s (HP%4d)" % [i, just(x.name,6,"　"), x.hp] },
+    name: -> x,i { "%02d %s (HP%4d)" % [i+1, just(x.name,6,"　"), x.hp] },
     cond: -> x,i { x.hp != x.mhp },
-    update: -> i { print "\r#{i}     " },
-    decide: -> i { puts DATA(i).name }
+    update: -> i { print "\r#{just(i,3,'0')} #{just(DATA(i).name,-20)} " },
+    decide: -> i { puts "",DATA(i).name }
   }
   
 end # module CLEX
@@ -155,12 +162,12 @@ class Game_Interpreter
     when nil
       return false
     when Hash
-      data = []
-      commands = []
-      (params[:data] && params[:data].call || []).each_with_index do |dt,i|
+      data, commands, i = [], [], 0
+      (params[:data] && params[:data].call || []).each do |dt|
         next if params[:cond] && !params[:cond].call(dt, i)
         data.push(dt)
         commands.push(params[:name] ? params[:name].call(dt, i) : dt)
+        i += 1
       end
       choice_decide ||= params[:decide]
       choice_update ||= params[:update]
