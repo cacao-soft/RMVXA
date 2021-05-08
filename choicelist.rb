@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 選択肢の表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.5
+#    バージョン ： 0.0.6
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -75,6 +75,7 @@ module CLEX
   CHOICES_PROC["＃エネミー"] = -> { commands($data_enemies, :name) }
   CHOICES_PROC["＃グループ"] = -> { commands($data_troops, :name) }
   CHOICES_PROC["＃ステート"] = -> { commands($data_states, :name) }
+  CHOICES_PROC["＃注釈"] = -> { terp { @comments } }
 
   CHOICES_PROC["three"] = -> { %w[キャラＡ キャラＢ キャラＣ] }
   
@@ -120,10 +121,17 @@ class << CAO::CLEX
     width < 0 ? "#{str}#{padding}" : "#{padding}#{str}"
   end
   def change_picture_opacity(i, s_num, e_num)
-    $game_map.screen.pictures.each do |pic|
+    terp.screen.pictures.each do |pic|
       next unless (pic.number == s_num)..(pic.number == e_num)
       pic.instance_variable_set(:@opacity, pic.number == i + s_num ? 255 : 0)
     end
+  end
+  def exec(interpreter, f, *args)
+    @interpreter = interpreter
+    f && f.call(*args)
+  end
+  def terp(&block)
+    block_given? ? @interpreter.instance_eval(&block) : @interpreter
   end
 end
 class Game_Message
@@ -144,7 +152,7 @@ class Game_Interpreter
   def setup_choices_ex(key, cancel_type, options)
     gmcp = $game_message.choice_parameters
     gmcp[:options] = {}
-    variable_id = CAO::CLEX::VARID
+    variable_id, choice_decide, choice_update = CAO::CLEX::VARID, nil, nil
     options.each do |opt|
       case opt
       when ''
@@ -163,16 +171,16 @@ class Game_Interpreter
       return false
     when Hash
       data, commands, i = [], [], 0
-      (params[:data] && params[:data].call || []).each do |dt|
-        next if params[:cond] && !params[:cond].call(dt, i)
+      (CAO::CLEX.exec(self, params[:data]) || []).each do |dt|
+        next if CAO::CLEX.exec(self, params[:cond], dt, i)
         data.push(dt)
-        commands.push(params[:name] ? params[:name].call(dt, i) : dt)
+        commands.push(CAO::CLEX.exec(self, params[:name], dt, i) || dt)
         i += 1
       end
       choice_decide ||= params[:decide]
       choice_update ||= params[:update]
     else
-      commands = CAO::CLEX::CHOICES_PROC[key].call
+      commands = CAO::CLEX.exec(self, CAO::CLEX::CHOICES_PROC[key])
       data = commands
     end
     choice_decide ||= -> i { $game_variables[variable_id] = i }
@@ -187,7 +195,7 @@ class Game_Interpreter
         @branch[@indent] = 4  # キャンセル
       else
         @branch[@indent] = 0  # 決定
-        choice_decide.call(n)
+        CAO::CLEX.exec(self, choice_decide, n)
       end
     end
     return true
