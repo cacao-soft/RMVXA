@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 文章のスクロール表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： *.*.*
+#    バージョン ： 1.0.0
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -11,10 +11,31 @@
 #   == 概    要 ==
 #
 #   ： イベントコマンド「文章のスクロール表示」でオプション指定可能にする
-#   ： スクロールせずに表示し、キー操作する。
-#   ： Ｂボタンで閉じる。下キーで一時停止。
-#   ： 文章の位置を変える。
 #
+#  --------------------------------------------------------------------------
+#   == 使用方法 ==
+#
+#    ★ オプションの指定
+#     イベントコマンド「文章のスクロール表示」の先頭行を #! で始める。
+#     各オプションは、半角空白で区切ります。
+#     
+#    ★ オプション
+#     noscroll: 自動スクロールを無効にし、上下ボタンで操作する。
+#               Ｂボタンで閉じる。スクロール量は速度で変更可能。
+#     window:   ウィンドウ枠を表示
+#     arrow:    スクロール可否を示す矢印を表示
+#     noover:   ウィンドウサイズを超える文章を破棄
+#     stop:     下ボタンでスクロールを一時停止
+#     cancel:   Ｂボタンで文章表示を終了
+#     center:   文章を中央寄せ
+#     right:    文章を右寄せ
+#     
+#    ★ 特殊なオプション
+#     このオプションは、他のオプションと併用できません。
+#     skip: コメントと見なし、スキップする。
+#     doc:  注釈と見なし、@comments に内容を保存する。
+#     rgss: スクリプトと見なし、実行する。
+#           さらに top オプションを加えるとトップレベルでの実行となる。
 #
 #******************************************************************************
 
@@ -70,6 +91,7 @@ class Window_ScrollText < Window_Base
   # ● リフレッシュ
   #--------------------------------------------------------------------------
   def refresh
+    reset_window_settings
     reset_font_settings
     update_all_text_height
     create_contents
@@ -144,13 +166,14 @@ class Window_ScrollText < Window_Base
   #--------------------------------------------------------------------------
   def draw_text_ex(x, y, text)
     reset_font_settings
+    #text = convert_escape_characters(text)
     pos = {:x => x, :y => y, :new_x => x}
     @text_ex.each_line.with_index do |line,i|
       if $game_message.scroll_align != 0
         pos[:x] = contents_width - calc_line_width(line)
         pos[:x] -= $game_message.scroll_align == 1 ? pos[:x] / 2 : x
       end
-      pos[:height] = @text_heights[i]
+      pos[:height] = @text_heights[i]#calc_line_height(line)
       process_character(line.slice!(0, 1), line, pos) until line.empty?
     end
   end
@@ -195,7 +218,21 @@ class Game_Interpreter
   def command_105
     header = @list[@index+1].parameters[0]
     if header.start_with?("#!")
-      setup_scroll_text(header[2..-1].split(" "))
+      @index += 1
+      params = header[2..-1].split(" ").map(&:downcase)
+      case params[0]
+      when "skip"
+        command_105_skip
+        return
+      when "doc"
+        @comments = command_105_array
+        return
+      when "script", "rgss"
+        command_105_script(params[1] == "top" ? TOPLEVEL_BINDING : binding)
+        return
+      else
+        setup_scroll_text(params)
+      end
     end
     _cao_scrolltext_command_105
   end
@@ -206,7 +243,7 @@ class Game_Interpreter
     Fiber.yield while $game_message.visible
     $game_message.clear_scrollex
     params.each do |param|
-      case param.downcase
+      case param
       when "noscroll" then $game_message.scroll_no_scroll = true
       when "window"   then $game_message.scroll_no_window = false
       when "arrow"    then $game_message.scroll_no_arrow = false
@@ -217,6 +254,40 @@ class Game_Interpreter
       when "right"    then $game_message.scroll_align = 2
       end
     end
-    @index += 1
+  end
+  #--------------------------------------------------------------------------
+  # ● コマンドスキップ
+  #    文章のスクロールを飛ばしてインデックスを進める。
+  #--------------------------------------------------------------------------
+  def command_105_skip
+    @index += 1 while next_event_code == 405
+  end
+  #--------------------------------------------------------------------------
+  # ● 文章のスクロールのインデックスを進めながら文章を配列化
+  #--------------------------------------------------------------------------
+  def command_105_array
+    result = []
+    while next_event_code == 405
+      @index += 1
+      result << @list[@index].parameters[0]
+    end
+    result
+  end
+  #--------------------------------------------------------------------------
+  # ● スクリプト
+  #--------------------------------------------------------------------------
+  def command_105_script(b)
+    cmd_index = @index
+    script = command_105_array.join("\n")
+    begin
+      b.eval(script, "文章のスクロール表示(#{cmd_index+1})", 1)
+    rescue SyntaxError
+      msg = "文章のスクロール表示(#{cmd_index+1}):" \
+            "#{@index-cmd_index}:" \
+            "実行されたイベントコマンドを確認してください。"
+      raise SyntaxError, msg, []
+    rescue => e
+      raise e
+    end
   end
 end
