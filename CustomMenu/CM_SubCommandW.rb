@@ -3,7 +3,7 @@
 #    ＊ サブコマンドウィンドウ
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.1.2
+#    バージョン ： 1.1.3
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： http://cacaosoft.webcrow.jp/
@@ -73,13 +73,13 @@ class Window_MenuSubCommand < Window_CustomMenuCommand
   # ● 
   #--------------------------------------------------------------------------
   def window_opacity
-    return params(:opacity, false) ? 0 : 255
+    return params(:opacity, params(:back, true) ? 255 : 0)
   end
   #--------------------------------------------------------------------------
   # ● 桁数の取得
   #--------------------------------------------------------------------------
   def col_max
-    return (params(:column, super) < 0) ? item_max : params(:column, super)
+    return params(:column, super).tap {|col| break item_max if col < 0 }
   end
   #--------------------------------------------------------------------------
   # ● 横に項目が並ぶときの空白の幅を取得
@@ -105,7 +105,8 @@ class Window_MenuSubCommand < Window_CustomMenuCommand
   # ● 
   #--------------------------------------------------------------------------
   def params(key, default)
-    return CONFIGURATION[@ident] && CONFIGURATION[@ident][key] || default
+    param = CONFIGURATION[@ident] && CONFIGURATION[@ident][key]
+    return param == nil ? default : param
   end
   #--------------------------------------------------------------------------
   # ● 
