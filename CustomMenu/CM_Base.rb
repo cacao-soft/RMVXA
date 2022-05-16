@@ -3,7 +3,7 @@
 #    ＊ Custom Menu Base
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.1.5
+#    バージョン ： 1.1.6
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： https://cacaosoft.mars.jp/
@@ -68,7 +68,7 @@ module CM
     :command  => Scene_End,
     :help     => 'ゲームを終了します。'
   }
-  
+
   COMMAND_ITEMS[:load] = {
     :name     => "ロード",
     :command  => Scene_Load,
@@ -99,7 +99,7 @@ module CM
     :command  => "$game_switches[17] ^= true",
     :refresh  => [:command]
   }
-  
+
   COMMAND_ITEMS[:sub] = {
     :name => "サブコマンド",
     :sub => :sub,
@@ -110,7 +110,7 @@ module CM
     :sub  => :file,
     :help => "ゲームのセーブ・ロードを行います。"
   }
-  
+
   #--------------------------------------------------------------------------
   # ◇ 表示項目の設定
   #--------------------------------------------------------------------------
@@ -134,7 +134,7 @@ module CM
   #     0 で文字サイズを基準に自動調整
   #--------------------------------------------------------------------------
   COMMAND_HEIGHT = 0
-  
+
   #--------------------------------------------------------------------------
   # ◇ 残りＨＰで顔グラを変化させる
   #--------------------------------------------------------------------------
@@ -153,7 +153,7 @@ module CM
   #--------------------------------------------------------------------------
   START_COMMON_ID     = 0     # 開始前処理
   TERMINATE_COMMON_ID = 0     # 終了前処理
-  
+
   #--------------------------------------------------------------------------
   # ◇ 背景画像
   #--------------------------------------------------------------------------
@@ -163,7 +163,7 @@ module CM
   FILE_BACKGROUND = nil
   # アニメ画像 ["ファイル名", vx, vy, 最背面？]
   BACKIMAGE = nil
-  
+
   #--------------------------------------------------------------------------
   # ◇ システム文字の有無
   #--------------------------------------------------------------------------
@@ -175,7 +175,7 @@ module CM
   VOCABS[:gold]  = "所持金"
   VOCABS[:exp]   = "経験値"
   VOCABS[:exp_a] = "LvUP"
-  
+
 end # module CM
 end # module CAO
 
@@ -191,14 +191,14 @@ class CustomizeError < Exception; end
 
 class Game_MenuItem
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
-  attr_reader :symbol                     # 
-  attr_reader :sub                        # 
-  attr_reader :enable                     # 
-  attr_reader :refresh_items              # 
+  attr_reader :symbol                     #
+  attr_reader :sub                        #
+  attr_reader :enable                     #
+  attr_reader :refresh_items              #
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def initialize(symbol, params = {})
     @symbol = symbol                          # 項目の識別子
@@ -207,7 +207,7 @@ class Game_MenuItem
     @icon   = params[:icon]                   # アイコン番号
     @enable = params[:enable] || true         # 選択の可否
     @hide   = params[:hide]   || false        # 非表示の有無
-    
+
     @scene    = params[:scene]                # 項目処理 シーン遷移
     @command  = params[:command]              # 項目処理 コマンド実行
     @personal = params[:personal]             # 項目処理 アクター選択
@@ -217,14 +217,14 @@ class Game_MenuItem
     when 1  # Do Nothing
     else;   raise CustomizeError, "複数の項目処理が設定されています。"
     end
-    
+
     @refresh_items = params[:refresh] || []     # 項目処理後に再描画
     @auto_close = params[:auto_close] || false  # アクター選択時コマンドを閉じる
     @continue = params[:continue] || false      # アクター選択継続
     @sw_sub = params[:sw_sub] || false          # サブ表示時にメインを非表示
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def _convert_value(obj)
     if obj.is_a?(Array)
@@ -249,26 +249,26 @@ class Game_MenuItem
   end
   private :_convert_value
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def name
     return _convert_value(@name)
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def help
     return _convert_value(@help)
   end
   alias description help
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def icon_index
     return _convert_value(@icon)
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def handler
     return :command_ok       if @scene
@@ -280,7 +280,7 @@ class Game_MenuItem
     raise "must not happen"
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def exec
     #
@@ -311,7 +311,7 @@ class Game_MenuItem
     raise "must not happen"
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def hide?
     #
@@ -328,31 +328,31 @@ class Game_MenuItem
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def personal?
     return !@personal.nil?
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def refresh?
     return !@refresh_items.empty?
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def switch?
     return @sw_sub
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def auto_close?
     return @auto_close
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def continue?
     return @continue
@@ -361,7 +361,7 @@ end
 
 class Scene_Menu::Game_Interpreter < Game_Interpreter
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   undef command_101         # 文章の表示
   undef command_102         # 選択肢の表示
@@ -449,7 +449,7 @@ class Scene_Menu
     @foreground_sprite.dispose if @foreground_sprite
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def update_backimage
     return unless @backimage_sprite
@@ -542,13 +542,13 @@ class Scene_Menu
     @caller[-2] || @command_window
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def change_console(console)
     @caller << console
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def return_console
     current_console.deactivate.close
@@ -571,7 +571,7 @@ class Scene_Menu
     check_common_event
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def command_sub
     if current_console == @subcommand_window
@@ -650,13 +650,13 @@ module CustomMenuCommand
     unlock
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def init_command(ident)
     @ident = ident
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def current_commands
     CAO::CM::COMMANDS[@ident]
@@ -692,21 +692,21 @@ module CustomMenuCommand
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def lock
     @locked = true
     self
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def unlock
     @locked = false
     self
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def locked?
     @locked
@@ -786,10 +786,10 @@ module CustomMenuCommand
     #
     # NameError : undefined method `○○' for class `Scene_Menu'
     #   つづりが間違っていないか確認してください。
-    # 
+    #
     # NameError : undefined method `command_sub' for class `Scene_Menu'
     #  『サブコマンド』スクリプトが未導入の可能性があります。
-    # 
+    #
     @list.each {|cmd| @handler[cmd.symbol] = obj.method(cmd.handler) }
   end
 end
@@ -870,7 +870,7 @@ end
 
 class Sprite_CustomMenuCursor < Sprite
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def initialize(data, viewport = nil)
     super(viewport)
@@ -879,7 +879,7 @@ class Sprite_CustomMenuCursor < Sprite
     @distance_y   = data[2] || 1
     @view_behind  = data[3] || data[3] == nil
     @flash_amount = data[4] || 0
-    
+
     self.bitmap = Cache.system(@filename)
     self.z = @view_behind ? -1 : 1
     self.ox = self.bitmap.width / 2
@@ -887,14 +887,14 @@ class Sprite_CustomMenuCursor < Sprite
     self.opacity = 0
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def update
     super
     update_flash
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def update_flash
     return if @flash_amount == 0
@@ -971,7 +971,7 @@ class Spriteset_CustomMenuCommand
     return nil
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def dispose
     dispose_command_sprites
@@ -1006,7 +1006,7 @@ class Spriteset_CustomMenuCommand
     self
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def openness=(value)
     @openness = value
@@ -1029,14 +1029,14 @@ class Spriteset_CustomMenuCommand
     self
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def open?
     @openness = 255 if @openness > 255
     return @openness == 255
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def close?
     @openness = 0 if @openness < 0
@@ -1057,7 +1057,7 @@ class Spriteset_CustomMenuCommand
     @closing = false if close?
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def visible=(value)
     @visible = value
@@ -1278,7 +1278,7 @@ class Spriteset_CustomMenuCommand
     !$game_system.save_disabled
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def create_cursor_sprite
     unless cursor_data
@@ -1290,7 +1290,7 @@ class Spriteset_CustomMenuCommand
     update_cursor_sprite
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def update_cursor_sprite
     return unless @cursor_sprite
@@ -1309,7 +1309,7 @@ class Spriteset_CustomMenuCommand
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def dispose_cursor_sprite
     return unless @cursor_sprite
@@ -1336,7 +1336,7 @@ class Spriteset_CustomMenuCommand
     return cursor_data[2]
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def item_rect(index)
     rect = Rect.new(0, 0, 0, 0)
@@ -1347,7 +1347,7 @@ class Spriteset_CustomMenuCommand
     return rect
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def create_command_sprites
     @command_sprites = Array.new(item_max) do |i|
@@ -1367,7 +1367,7 @@ class Spriteset_CustomMenuCommand
     @command_sprites.each {|sp| sp.update }
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def dispose_command_sprites
     return unless @command_sprites
@@ -1377,7 +1377,7 @@ class Spriteset_CustomMenuCommand
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def image_index(index)
     result = 0
@@ -1392,7 +1392,7 @@ class Spriteset_CustomMenuCommand
     rect = @command_sprites[index].bitmap.rect
     if multi_image?
       cmd_index = current_commands.index(@list[index].symbol)
-      rect.x = @command_sprites[index].bitmap.width * image_index(index) 
+      rect.x = @command_sprites[index].bitmap.width * image_index(index)
       rect.y = @command_sprites[index].bitmap.height * cmd_index
     else
       rect.x = 0
@@ -1401,7 +1401,7 @@ class Spriteset_CustomMenuCommand
     return rect
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def refresh_command(index)
     bitmap = @command_sprites[index].bitmap
@@ -1409,7 +1409,7 @@ class Spriteset_CustomMenuCommand
     bitmap.blt(0, 0, command_image(index), image_rect(index))
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def refresh_commands
     @command_sprites.each_with_index do |sp, i|
@@ -1418,7 +1418,7 @@ class Spriteset_CustomMenuCommand
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def command_image(index)
     if multi_image?
@@ -1428,20 +1428,20 @@ class Spriteset_CustomMenuCommand
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def multi_image?
     return !command_filename.empty?
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def image_width(index)
     return command_image(index).width / 4 if multi_image?
     return command_image(index).width
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def image_height(index)
     return command_image(index).height / command_max if multi_image?
@@ -1529,13 +1529,13 @@ class CAO::CM::Canvas
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def contents
     return @window ? @window.contents : @bitmap
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def draw_actor_items(actor, x, y, list)
     #
@@ -1551,7 +1551,7 @@ class CAO::CM::Canvas
     # ArgumentError : wrong number of arguments
     #   引数の数が間違っています。
     #   オプション部分の設定に間違いがないか確認してください。
-    #   
+    #
     list.each do |params|
       symbol = params[0]
       argv = params[1, params.size]
@@ -1575,7 +1575,7 @@ class CAO::CM::Canvas
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   METHODS_NAME = {}
   METHODS_NAME[:w_chara] = '@window.draw_actor_graphic'
@@ -1588,7 +1588,7 @@ class CAO::CM::Canvas
   METHODS_NAME[:w_hp]    = '@window.draw_actor_hp'
   METHODS_NAME[:w_mp]    = '@window.draw_actor_mp'
   METHODS_NAME[:w_tp]    = '@window.draw_actor_tp'
-  
+
   if CAO::CM::EXPRESSIVE_RATE.empty?
     METHODS_NAME[:face] = :draw_actor_face
   else
@@ -1630,7 +1630,7 @@ class CAO::CM::Canvas
     return 160
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def str2color(value)
     case value
@@ -1838,7 +1838,7 @@ class CAO::CM::Canvas
     text.slice!(/^\[-?\d+\]/)[/-?\d+/].to_i rescue 0
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def obtain_escape_value(text, value)
     text.slice!(/^\[([+-]?)(\d+)\]/i)
@@ -1847,7 +1847,7 @@ class CAO::CM::Canvas
     return $2.to_i
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ●
   #--------------------------------------------------------------------------
   def obtain_escape_picparam(text)
     return [] unless text.slice!(/^\[(.+?)\]/)
@@ -1900,7 +1900,7 @@ class CAO::CM::Canvas
       # 線の描画位置 (t:上,m:中,b:下, デフォルトは下)
       unless params[/T/i]
         if params[/M/i]
-          y += (pos[:height] + h) / 2 
+          y += (pos[:height] + h) / 2
         else
           y += pos[:height] - h
         end
@@ -2034,7 +2034,7 @@ class CAO::CM::Canvas
     dest_rect = Rect.new(x, y, 96, 96)
     src_rect = Rect.new(face_index % 4 * 96, face_index / 4 * 96, 96, 96)
     opacity = enabled ? 255 : translucent_alpha
-    
+
     case size
     when Integer
       src_rect.x += (96 - size) / 2
@@ -2158,21 +2158,30 @@ class CAO::CM::Canvas
   #     [:pict, x, y, "file", "script"]
   #     [:pict, x, y, nil, "script"]
   #     [:pict, x, y, ["file","file"], "script(bool)"]
-  #     [:pict, x, y, ["file","file"], "script(number)"]
+  #     [:pict, x, y, ["file", ...], "script(number)"]
   #     [:pict, x, y, "pattern", "script"]
   #--------------------------------------------------------------------------
   def draw_actor_picture(actor, x, y, file, script = nil)
-    return unless actor
-    r, f1, f2 = script && eval(script), *file
-    case r
-    when nil
-      filename = (actor.battle_member? ? f1 : f2) || f1
-    when true, false
-      filename = r ? f1 : f2
+    # [:pict, x, y] の排除
+    return if actor == nil || (file == nil && script == nil)
+    if file == nil
+      # [:pict, x, y, nil, "script"]
+      filename = eval(script).to_s
+    elsif script == nil && String == file
+      # [:pict, x, y, file]
+      filename = file
     else
-      filename = file.nil?             ? r
-               : file.kind_of?(String) ? sprintf(file, *r)
-               : file[r]
+      file1, file2 = *file
+      eval_results = (script == nil) ? actor.battle_member? : eval(script)
+      filename = case
+        # [:pict, x, y, ["file","file"], "script(bool)"]
+        when eval_results == true  then file1
+        when eval_results == false then file2
+        # [:pict, x, y, "pattern", "script"]
+        when String === file       then sprintf(file, *eval_results)
+        # [:pict, x, y, ["file", ...], "script(number)"]
+        else                            file[eval_results.to_i]
+      end
     end
     if filename && filename != ""
       bitmap = Cache.picture(filename % actor.id)
@@ -2195,11 +2204,11 @@ class CAO::CM::Canvas
     param = String(num.is_a?(String) ? eval(num) : num)
     param.split(//).each_with_index do |c,i|
       case c
-      when ' ';   next
-      when '+';   index = 10
-      when '-';   index = 11
-      when /\d/;  index = Integer(c)
-      else;       index = 12
+      when ' '  then next
+      when '+'  then index = 10
+      when '-'  then index = 11
+      when /\d/ then index = Integer(c)
+      else           index = 12
       end
       r_num.x = r_num.width * index
       self.contents.blt(x + r_num.width * i, y, bitmap, r_num)
