@@ -3,10 +3,10 @@
 #    ＊ Custom Menu Base
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.1.4
+#    バージョン ： 1.1.5
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
-#    配  布  元 ： http://cacaosoft.webcrow.jp/
+#    配  布  元 ： https://cacaosoft.mars.jp/
 #  --------------------------------------------------------------------------
 #   == 概    要 ==
 #
@@ -1578,7 +1578,7 @@ class CAO::CM::Canvas
   # ● 
   #--------------------------------------------------------------------------
   METHODS_NAME = {}
-  METHODS_NAME[:w_chara] = '@window.draw_actor_graphics'
+  METHODS_NAME[:w_chara] = '@window.draw_actor_graphic'
   METHODS_NAME[:w_face]  = '@window.draw_actor_face'
   METHODS_NAME[:w_name]  = '@window.draw_actor_name'
   METHODS_NAME[:w_class] = '@window.draw_actor_class'
