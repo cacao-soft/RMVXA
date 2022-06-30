@@ -3,7 +3,7 @@
 #    ＊ ぽぽぽメッセージウィンドウ
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.1
+#    バージョン ： 0.0.2
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： https://cacaosoft.mars.jp/
@@ -11,6 +11,12 @@
 #   == 概    要 ==
 #
 #   ： メッセージに合わせてサイズの変わるメッセージウィンドウに変更します
+#
+#  --------------------------------------------------------------------------
+#   == 使用方法 ==
+#
+#    ★ ぽぽぽ機能を使用する
+#     SWITCH_ID で設定した番号のスイッチを ON にする
 #
 #
 #******************************************************************************
@@ -23,7 +29,15 @@ module CAO
 module PppMsg
 
   #--------------------------------------------------------------------------
-  # ◇ 文字表示のウェイト時間
+  # ◇ ぽぽぽ機能をオフにするスイッチの番号
+  #--------------------------------------------------------------------------
+  SWITCH_ID = 1
+  #--------------------------------------------------------------------------
+  # ◇ 戦闘メッセージの表示位置 (ぽぽぽ機能 ON のときのみ)
+  #--------------------------------------------------------------------------
+  BATTLE_MSG_POSITION = 1
+  #--------------------------------------------------------------------------
+  # ◇ 文字表示のウェイト時間 (ぽぽぽ機能 ON のときのみ)
   #--------------------------------------------------------------------------
   WAIT = 3
 
@@ -38,13 +52,18 @@ end # module CAO
 #/////////////////////////////////////////////////////////////////////////////#
 
 
+class << CAO::PppMsg
+  def on?
+    $game_switches[CAO::PppMsg::SWITCH_ID]
+  end
+end
 class << BattleManager
   #--------------------------------------------------------------------------
   # ● 戦闘開始
   #--------------------------------------------------------------------------
   alias _cao_pppmsg_battle_start battle_start
   def battle_start
-    $game_message.position = 1
+    update_message_position
     _cao_pppmsg_battle_start
   end
   #--------------------------------------------------------------------------
@@ -52,8 +71,14 @@ class << BattleManager
   #--------------------------------------------------------------------------
   alias _cao_pppmsg_judge_win_loss judge_win_loss
   def judge_win_loss
-    $game_message.position = 1
+    update_message_position
     _cao_pppmsg_judge_win_loss
+  end
+  private
+  def update_message_position
+    if CAO::PppMsg.on?
+      $game_message.position = CAO::PppMsg::BATTLE_MSG_POSITION
+    end
   end
 end
 class Window_Message < Window_Base
@@ -63,7 +88,6 @@ class Window_Message < Window_Base
   alias _cao_pppmsg_initialize initialize
   def initialize
     _cao_pppmsg_initialize
-    self.arrows_visible = false
     reset_window_size
     redefine_update_placement
   end
@@ -77,17 +101,19 @@ class Window_Message < Window_Base
       end
       def wnd.update_placement
         _cao_pppmsg_update_placement
-        top_y = @message_window.y
-        bottom_y = @message_window.y + @message_window.height
-        padding_top = @message_window.y
-        padding_bottom = Graphics.height - bottom_y
-        padding = padding_top
-        padding = padding_bottom if padding_top < padding_bottom
-        padding = [self.padding, (padding - self.height) / 2].min
-        self.x = @message_window.x
-        self.x += (@message_window.width - self.width) / 2
-        self.y = top_y - self.height - padding
-        self.y = bottom_y + padding if padding_top < padding_bottom
+        if CAO::PppMsg.on?
+          top_y = @message_window.y
+          bottom_y = @message_window.y + @message_window.height
+          padding_top = @message_window.y
+          padding_bottom = Graphics.height - bottom_y
+          padding = padding_top
+          padding = padding_bottom if padding_top < padding_bottom
+          padding = [self.padding, (padding - self.height) / 2].min
+          self.x = @message_window.x
+          self.x += (@message_window.width - self.width) / 2
+          self.y = top_y - self.height - padding
+          self.y = bottom_y + padding if padding_top < padding_bottom
+        end
       end
     end
   end
@@ -95,21 +121,29 @@ class Window_Message < Window_Base
   # ● 表示行数の取得
   #--------------------------------------------------------------------------
   def visible_line_number
-    return 8
+    return CAO::PppMsg.on? ? 8 : 4
   end
   #--------------------------------------------------------------------------
   # ● ウィンドウサイズのリセット
   #--------------------------------------------------------------------------
   def reset_window_size
-    self.width = self.padding * 2
-    self.height = self.padding * 2 + line_height
-    self.x = Graphics.width / 2 - self.padding
-    if $game_party.in_battle || @position == 1
-      self.y = Graphics.height / 2 - self.padding
+    if CAO::PppMsg.on?
+      self.arrows_visible = false
+      self.width = self.padding * 2
+      self.height = self.padding * 2 + line_height
+      self.x = Graphics.width / 2 - self.padding
+      if $game_party.in_battle || @position == 1
+        self.y = Graphics.height / 2 - self.padding
+      else
+        onethird_height = Graphics.height / 3
+        self.y = (@position == 0) ? 0 : Graphics.height - onethird_height
+        self.y += (onethird_height - self.height) / 2
+      end
     else
-      onethird_height = Graphics.height / 3
-      self.y = (@position == 0) ? 0 : Graphics.height - onethird_height
-      self.y += (onethird_height - self.height) / 2 - self.padding
+      update_placement
+      self.arrows_visible = true
+      self.width = window_width
+      self.height = window_height
     end
   end
   #--------------------------------------------------------------------------
@@ -135,8 +169,11 @@ class Window_Message < Window_Base
       input_pause
       new_page(text, pos)
     elsif text != ""
-      self.height += pos[:height]
-      self.y -= pos[:height] / 2
+      contents_height = self.height - (self.padding * 2)
+      if contents_height < pos[:y] + pos[:height]
+        self.height += pos[:height]
+        self.y -= pos[:height] / 2
+      end
     end
   end
   #--------------------------------------------------------------------------
@@ -159,7 +196,7 @@ class Window_Message < Window_Base
   # ● 一文字出力後のウェイト時間
   #--------------------------------------------------------------------------
   def wait_time
-  	CAO::PppMsg::WAIT
+    CAO::PppMsg.on? ? CAO::PppMsg::WAIT : 1
   end
   #--------------------------------------------------------------------------
   # ● 一文字出力後のウェイト
