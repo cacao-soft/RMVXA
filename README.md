@@ -6,4 +6,4 @@ RPGツクールVX Ace で動作する RGSS3 スクリプトです。
 - 
 
 ## ライセンス
-- [利用規約](http://cacaosoft.webcrow.jp/rule.html)
+- [利用規約](https://cacaosoft.mars.jp/rule.html)
