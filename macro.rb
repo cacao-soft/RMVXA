@@ -3,10 +3,10 @@
 #    ＊ 共有マクロ
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.0.1
+#    バージョン ： 1.0.2
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
-#    配  布  元 ： http://cacaosoft.webcrow.jp/
+#    配  布  元 ： https://cacaosoft.mars.jp/
 #  --------------------------------------------------------------------------
 #
 #   == 概    要 ==
@@ -20,7 +20,7 @@
 #     プロジェクトの親フォルダに _MCR_ フォルダを作成します。
 #     その中の _ フォルダは、プロジェクト固有のマクロとなります。
 #     _ 内に対象のプロジェクトと同名のフォルダを作成してください。
-#     
+#
 #    ■ RPGVXAce         |  [フォルダ構成]
 #    ├□ _MCR_          |  _MCR_ マクロフォルダ (必須)
 #    │├□ _            |  _     プロジェクトマクロフォルダ
@@ -179,6 +179,13 @@ module CAO::MACRO::DirEx
       end
     end
   end
+end
+def InputBox(msg, title="入力")
+  cmd =  'mshta vbscript:execute("'
+  cmd << 'r=InputBox(""' << msg << '"",""' << title << '""):'
+  cmd << 'CreateObject(""Scripting.FileSystemObject"")'
+  cmd << '.GetStandardStream(1).Write(r):close")'
+  %x(#{cmd.encode("Shift_JIS", "UTF-8")}).encode("UTF-8", "Shift_JIS")
 end
 if $TEST && Dir.exist?(CAO::MACRO::DIRECTORY)
   class Scene_Base
