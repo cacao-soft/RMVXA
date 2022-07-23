@@ -3,10 +3,10 @@
 #    ＊ ＜拡張＞ 選択肢の表示
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 0.0.6
+#    バージョン ： 0.1.0
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
-#    配  布  元 ： http://cacaosoft.webcrow.jp/
+#    配  布  元 ： https://cacaosoft.mars.jp/
 #  --------------------------------------------------------------------------
 #   == 概    要 ==
 #
@@ -56,7 +56,7 @@ module CLEX
   # ◇ 選択肢の処理
   #--------------------------------------------------------------------------
   CHOICES_PROC = {} # nil と "" 禁止
-  
+
   # 項目名
   CHOICES_PROC["＃パーティ"] = -> { $game_party.all_members.map!(&:name) }
   CHOICES_PROC["＃戦闘員"] = -> { $game_party.battle_members.map!(&:name) }
@@ -69,7 +69,7 @@ module CLEX
   CHOICES_PROC["＃装備"] =
     -> { commands([*$data_weapons, *$data_armors], :name) }
   CHOICES_PROC["＃アイテム"] =
-    -> { commands([*$data_items, *$data_weapons, *$data_armors], :name) }
+    -> { commands([*$data_items, *$data_weapons,*$data_armors], :name) }
   CHOICES_PROC["＃スキル"] = -> { commands($data_skills, :name) }
   CHOICES_PROC["＃クラス"] = -> { commands($data_classes, :name) }
   CHOICES_PROC["＃エネミー"] = -> { commands($data_enemies, :name) }
@@ -78,22 +78,24 @@ module CLEX
   CHOICES_PROC["＃注釈"] = -> { terp { @comments } }
 
   CHOICES_PROC["three"] = -> { %w[キャラＡ キャラＢ キャラＣ] }
-  
+
   # 決定
-  CHOICES_PROC["＆項目名"] = -> i { $game_variables[8] = commands[i] }
-  
+  CHOICES_PROC["＆項目名"] = -> i { $game_variables[variable_id] = commands[i] }
+  CHOICES_PROC["＆データ"] = -> i { $game_variables[variable_id] = data[i] }
+  CHOICES_PROC["＆番号"] = -> i { $game_variables[variable_id] = data[i].id }
+
   # 選択更新
   CHOICES_PROC["＆更新"] = -> i { change_picture_opacity(i, 4, 6) }
-  
+
   # まとめて設定
   CHOICES_PROC["actor"] = {
     data: -> { $game_actors.instance_eval{@data}.compact },
     name: -> x,i { "%02d %s (HP%4d)" % [i+1, just(x.name,6,"　"), x.hp] },
     cond: -> x,i { x.hp != x.mhp },
-    update: -> i { print "\r#{just(i,3,'0')} #{just(DATA(i).name,-20)} " },
-    decide: -> i { puts "",DATA(i).name }
+    update: -> i { print "\r#{just(i,3,'0')} #{just(data[i].name,-20)} " },
+    decide: -> i { puts "", data[i].name }
   }
-  
+
 end # module CLEX
 end # module CAO
 
@@ -106,13 +108,22 @@ end # module CAO
 
 
 class << CAO::CLEX
-  def DATA(index)
-    $game_message.choice_parameters[:data][index]
+  def data
+    $game_message.choice_parameters[:data]
+  end
+  def variable_id
+    $game_message.choice_parameters[:variable]
   end
   def commands(data = nil, property_name = nil, &block)
-    list = (data||$game_message.choices).compact
+    return $game_message.choices unless data
+    unless property_name || block
+      raise ArgumentError,
+        "wrong number of arguments (given 1, expected 0 or 2)", caller
+    end
+    list = data.compact
     list.select!(&block) if block
-    list.map!(&property_name).to_a
+    result = (property_name) ? list.map(&property_name) : list
+    return [result, list]
   end
   def just(str, width, padding = " ")
     char_size = padding.bytesize == 1 ? 1 : 2
@@ -182,8 +193,12 @@ class Game_Interpreter
     else
       commands = CAO::CLEX.exec(self, CAO::CLEX::CHOICES_PROC[key])
       data = commands
+      if commands.size == 2 && commands.all? {|e| e.is_a?(Array) }
+        commands, data = commands
+      end
     end
     choice_decide ||= -> i { $game_variables[variable_id] = i }
+    gmcp[:variable] = variable_id
     gmcp[:data] = data
     gmcp[:commands] = commands
     gmcp[:update] = choice_update
