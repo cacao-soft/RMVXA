@@ -3,7 +3,7 @@
 #    ＊ エセフルスクリーン
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.0.2
+#    バージョン ： 1.0.3
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： https://cacaosoft.mars.jp/
@@ -40,7 +40,11 @@ module WND_SIZE
   #     [ [横幅, 縦幅], ... ] のような二次元配列で設定します。
   #     幅を 0 にするとデスクトップサイズになります。
   #--------------------------------------------------------------------------
-  SIZE_LIST = [ [544,416], [640,480], [800,600], [1088,832], [0,0] ]
+  SIZE_LIST = [
+  	[Graphics.width, Graphics.height],
+  	[Graphics.width * 2, Graphics.height * 2],
+  	[Graphics.width * 3, Graphics.height * 3],
+  ]
   #--------------------------------------------------------------------------
   # ◇ セーブファイル
   #--------------------------------------------------------------------------
@@ -101,7 +105,6 @@ module WLIB
   #--------------------------------------------------------------------------
   GAME_TITLE  = load_data("Data/System.rvdata2").game_title.encode('SHIFT_JIS')
   GAME_HANDLE = @@FindWindow.call("RGSS Player", GAME_TITLE)
-  # GAME_HANDLE = Win32API.new('user32', 'GetForegroundWindow', 'v', 'l').call
   GAME_STYLE   = @@GetWindowLong.call(GAME_HANDLE, -16)
   GAME_EXSTYLE = @@GetWindowLong.call(GAME_HANDLE, -20)
   HDSK = @@GetDesktopWindow.call
@@ -207,6 +210,7 @@ module_function
     wr = GetGameWindowRect()      # Rect ウィンドウ
     cr = GetGameClientRect()      # Rect クライアント
     return false unless dr && wr && cr
+
     # フレームサイズの取得
     frame = GetFrameSize()
     ft = frame[0] + frame[2]      # タイトルバーの縦幅
@@ -228,20 +232,35 @@ end
 
 class Scene_Base
   #--------------------------------------------------------------------------
-  # ●
+  # ● クラス変数
   #--------------------------------------------------------------------------
-  @@screen_mode = 0
+  @@screen_mode = 0   # スクリーンモード (サイズリストのインデックス)
   #--------------------------------------------------------------------------
-  # ●
+  # ● ウィンドウサイズ番号を設定
   #--------------------------------------------------------------------------
   def self.screen_mode=(index)
     @@screen_mode = index % WND_SIZE::SIZE_LIST.size
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 現在のウィンドウサイズ番号を取得
   #--------------------------------------------------------------------------
   def self.screen_mode
     @@screen_mode
+  end
+  #--------------------------------------------------------------------------
+  # ● フルスクリーン表示になっているか
+  #--------------------------------------------------------------------------
+  def fullscreen?
+    WLIB::GetSystemMetrics(0) == 640 && WLIB::GetSystemMetrics(1) == 480
+  end
+  #--------------------------------------------------------------------------
+  # ● ウィンドウサイズを変更するか
+  #--------------------------------------------------------------------------
+  def change_window_size?
+    return false unless Input.trigger?(WND_SIZE::INPUT_KEY)
+    return false if WLIB::GAME_HANDLE == 0
+    return false if fullscreen?
+    return true
   end
   #--------------------------------------------------------------------------
   # ○ フレーム更新
@@ -249,7 +268,7 @@ class Scene_Base
   alias _cao_update_wndsize update
   def update
     _cao_update_wndsize
-    if Input.trigger?(WND_SIZE::INPUT_KEY) && WLIB::GAME_HANDLE != 0
+    if change_window_size?
       Scene_Base.screen_mode += 1
       if WLIB::SetGameWindowSize(*WND_SIZE::SIZE_LIST[@@screen_mode])
         if WND_SIZE::FILE_SAVE
