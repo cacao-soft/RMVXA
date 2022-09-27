@@ -3,10 +3,10 @@
 #    ＊ 画像保存
 #
 #  --------------------------------------------------------------------------
-#    バージョン ：  1.0.0
-#    対      応 ：  RPGツクールVX Ace : RGSS3
-#    制  作  者 ：  ＣＡＣＡＯ
-#    配  布  元 ：  https://cacaosoft.mars.jp/
+#    バージョン ： 1.0.2
+#    対      応 ： RPGツクールVX Ace : RGSS3
+#    制  作  者 ： ＣＡＣＡＯ
+#    配  布  元 ： https://cacaosoft.mars.jp/
 #  --------------------------------------------------------------------------
 #   == 概    要 ==
 #
@@ -26,7 +26,6 @@
 #     back     : 背景色 (Color.new(0,0,0), [0,0,0], :white)
 #
 #    ※ ファイル名の拡張子が省略された場合は、自動で追加します。
-#    ※ アルファチャンネルの情報は除去されます。
 #
 #
 #******************************************************************************
@@ -53,6 +52,7 @@ module GDIP
   
   CP_ACP   = 0x0000
   CP_UTF8  = 0xFDE9
+  
   #--------------------------------------------------------------------------
   # ● Win32API
   #--------------------------------------------------------------------------
@@ -81,10 +81,12 @@ module GDIP
   
   @@GdiplusStartup =
     Win32API.new('gdiplus', 'GdiplusStartup', 'ppi', 'i')
+  @@GdipCreateBitmapFromScan0 =
+    Win32API.new('gdiplus', 'GdipCreateBitmapFromScan0', 'iiiipp', 'i')
   @@GdipCreateBitmapFromHBITMAP =
     Win32API.new('gdiplus', 'GdipCreateBitmapFromHBITMAP', 'iip', 'i')
-  @@GdipCreateBitmapFromGdiDib =
-    Win32API.new('gdiplus', 'GdipCreateBitmapFromGdiDib', 'iip', 'i')
+  @@GdipBitmapConvertFormat =
+    Win32API.new('gdiplus', 'GdipBitmapConvertFormat', 'piiipi', 'i') rescue nil
   @@GdipSaveImageToFile =
     Win32API.new('gdiplus', 'GdipSaveImageToFile', 'pppp', 'i')
   @@GdipDisposeImage =
@@ -94,6 +96,17 @@ module GDIP
 
   @@UuidFromString =
     Win32API.new('rpcrt4', 'UuidFromString', 'pp', 'i')
+    
+  @@GdipBitmapLockBits =
+    Win32API.new('gdiplus', 'GdipBitmapLockBits', 'ppiip', 'i')
+  @@GdipBitmapUnlockBits =
+    Win32API.new('gdiplus', 'GdipBitmapUnlockBits', 'pp', 'i')
+  
+  @@RtlMoveMemory =
+    Win32API.new('kernel32', 'RtlMoveMemory', 'ppi', 'v')
+    
+  PF_RGB  = 0x00021808
+  PF_ARGB = 0x0026200A
 
   #--------------------------------------------------------------------------
   # ● ウィンドウの情報
@@ -171,6 +184,33 @@ module_function
   #--------------------------------------------------------------------------
   # ● 
   #--------------------------------------------------------------------------
+  def GdipCreateImageFromBitmap(bitmap)
+    gpbmp = [0].pack("i")
+    if @@GdipCreateBitmapFromScan0.call(
+      bitmap.width, bitmap.height, 0, PF_ARGB, 0, gpbmp) == 0
+      
+      image = gpbmp.unpack("i")[0]
+      r = [0, 0, bitmap.width, bitmap.height].pack("i4")
+      bd = [0, 0, 0, 0, 0, 0].pack("i6")
+      @@GdipBitmapLockBits.call(image, r, 3, PF_ARGB, bd)
+      @@GdipBitmapUnlockBits.call(image, bd)
+      bd = bd.unpack("i*")
+      data = Array.new(bitmap.width * bitmap.height * 4, 0).pack("C*")
+      @@RtlMoveMemory.call(data, bitmap.data, data.size)
+      data = data.unpack("C*")
+      data = Array.new(bitmap.height) do |i|
+        data[data.size - bitmap.width * 4 * (i + 1), bitmap.width * 4]
+      end.flatten!.pack("C*")
+      @@RtlMoveMemory.call(bd[4], data, bitmap.width * bitmap.height * 4)
+      
+      return image
+    else
+      return nil
+    end
+  end
+  #--------------------------------------------------------------------------
+  # ● 
+  #--------------------------------------------------------------------------
   def GdipCreateImageFromHBITMAP(hbm)
     gpbmp = [0].pack("i")
     if @@GdipCreateBitmapFromHBITMAP.call(hbm, 0, gpbmp) == 0
@@ -182,20 +222,16 @@ module_function
   #--------------------------------------------------------------------------
   # ● 
   #--------------------------------------------------------------------------
-  def GdipCreateImageFromGdiDib(bitmap)
-    gpbmp = [0].pack("i")
-    if @@GdipCreateBitmapFromGdiDib.call(bitmap.info, bitmap.data, gpbmp) == 0
-      return gpbmp.unpack("i")[0]
-    else
-      return nil
-    end
+  def GdipSaveImageToFile(image, filename, clsid)
+    ret = @@GdipSaveImageToFile.call(image, filename, UuidFromString(clsid), 0)
+    msgbox "保存に失敗しました。" if ret != 0
   end
   #--------------------------------------------------------------------------
   # ● 
   #--------------------------------------------------------------------------
-  def GdipSaveImageToFile(image, filename, clsid)
-    ret = @@GdipSaveImageToFile.call(image, filename, UuidFromString(clsid), 0)
-    msgbox "保存に失敗しました。" if ret != 0
+  def GdipImageConvertPixelFormat(image, pixel_format)
+    return unless @@GdipBitmapConvertFormat
+    @@GdipBitmapConvertFormat.call(image, pixel_format, 0, 0, 0, 0)
   end
   #--------------------------------------------------------------------------
   # ● 
@@ -264,25 +300,15 @@ class Bitmap
     fn += ext if File.extname(fn).empty?
     filename = GDIP::MultiByteToWideChar(fn)
     
-    wnddc = GDIP::GetDC(GDIP::GAME_HANDLE)
-    memdc = GDIP::CreateCompatibleDC(wnddc)
-    hbm = GDIP::CreateCompatibleBitmap(wnddc, Graphics.width, Graphics.height)
-    if GDIP::SelectObject(memdc, hbm)
-      GDIP::CopyDC(memdc, wnddc, Graphics.width, Graphics.height)
-      token = [0].pack("i")
-      if GDIP::GdiplusStartup(token)
-        # image = GDIP::GdipCreateImageFromGdiDib(self)
-        image = GDIP::GdipCreateImageFromGdiDib(bitmap)
-        if image
-          GDIP::GdipSaveImageToFile(image, filename, clsid)
-          GDIP::GdipDisposeImage(image)
-        end
-        GDIP::GdiplusShutdown(token)
+    token = [0].pack("i")
+    if GDIP::GdiplusStartup(token)
+      image = GDIP::GdipCreateImageFromBitmap(bitmap)
+      if image
+        GDIP::GdipSaveImageToFile(image, filename, clsid)
+        GDIP::GdipDisposeImage(image)
       end
+      GDIP::GdiplusShutdown(token)
     end
-    GDIP::ReleaseDC(GDIP::GAME_HANDLE, wnddc)
-    GDIP::DeleteDC(memdc)
-    GDIP::DeleteObject(hbm)
     
     bitmap.dispose
   end
@@ -290,7 +316,7 @@ class Bitmap
   # ● 
   #--------------------------------------------------------------------------
   def save_png(filename, alpha = false)
-    save(filename, :PNG, :white)
+    save(filename, :PNG, alpha ? nil : :white)
   end
 end
 
@@ -317,6 +343,7 @@ module Graphics
       token = [0].pack("i")
       if GDIP::GdiplusStartup(token)
         image = GDIP::GdipCreateImageFromHBITMAP(hbm)
+        GDIP::GdipImageConvertPixelFormat(image, GDIP::PF_ARGB)
         if image
           GDIP::GdipSaveImageToFile(image, filename, clsid)
           GDIP::GdipDisposeImage(image)
