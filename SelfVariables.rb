@@ -1,9 +1,8 @@
 #=============================================================================
-#  [RGSS3] セルフ変数 - v0.0.2
+#  [RGSS3] セルフ変数 - v0.0.3
 # ---------------------------------------------------------------------------
 #  Copyright (c) 2022 CACAO
-#  Released under the MIT License.
-#  https://opensource.org/licenses/MIT
+#  Released under the MIT License. see https://opensource.org/licenses/MIT
 # ---------------------------------------------------------------------------
 #  [Twitter] https://twitter.com/cacao_soft/
 #  [GitHub]  https://github.com/cacao-soft/
@@ -20,13 +19,13 @@ SELF_VARIABLE_ID_RANGE = 1..5
 
 class Game_Variables
   #--------------------------------------------------------------------------
-  # ● 
+  # ● セルフ変数対象のイベントをクリア
   #--------------------------------------------------------------------------
   def clear_event
     @self_variable_key = nil
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ● セルフ変数対象のイベントを設定
   #--------------------------------------------------------------------------
   def set_event(map_id, event_id)
     if map_id == 0 || event_id == 0
@@ -36,14 +35,13 @@ class Game_Variables
     end
   end
   #--------------------------------------------------------------------------
-  # ● 
+  # ● セルフ変数対象のイベントを取得
   #--------------------------------------------------------------------------
   def get_event_key(variable_id)
     if variable_id.is_a?(Array)
       variable_id
     elsif SELF_VARIABLE_ID_RANGE === variable_id && @self_variable_key
-      @self_variable_key[2] = variable_id
-      @self_variable_key
+      @self_variable_key.tap {|a| a[2] = variable_id }
     else
       nil
     end
@@ -73,6 +71,17 @@ class Game_Variables
   end
 end
 
+class Game_Event < Game_Character
+  #--------------------------------------------------------------------------
+  # ● イベントページの条件合致判定
+  #--------------------------------------------------------------------------
+  alias _cao_self_variables_conditions_met? conditions_met?
+  def conditions_met?(page)
+  	$game_variables.set_event(@map_id, @id)
+    _cao_self_variables_conditions_met?(page)
+  end
+end
+
 class Game_Interpreter
   #--------------------------------------------------------------------------
   # ● フレーム更新
@@ -81,7 +90,6 @@ class Game_Interpreter
     if @fiber
       $game_variables.set_event(@map_id, @event_id)
       @fiber.resume
-    else
       $game_variables.clear_event
     end
   end
