@@ -1,5 +1,5 @@
 #=============================================================================
-#  [RGSS3] セルフ変数 - v0.0.1
+#  [RGSS3] セルフ変数 - v0.0.2
 # ---------------------------------------------------------------------------
 #  Copyright (c) 2022 CACAO
 #  Released under the MIT License.
@@ -81,7 +81,8 @@ class Game_Interpreter
     if @fiber
       $game_variables.set_event(@map_id, @event_id)
       @fiber.resume
+    else
+      $game_variables.clear_event
     end
-    $game_variables.clear_event
   end
 end
