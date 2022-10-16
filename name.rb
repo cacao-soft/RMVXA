@@ -3,7 +3,7 @@
 #    ＊ ＜拡張＞ 名前入力の処理
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.1.5
+#    バージョン ： 1.1.6
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： https://cacaosoft.mars.jp/
@@ -163,7 +163,7 @@ class Game_Temp
   #--------------------------------------------------------------------------
   # ● 公開インスタンス変数
   #--------------------------------------------------------------------------
-  attr_accessor :name_mode                #
+  attr_accessor :name_mode                # グラフィック表示設定
   attr_accessor :name_empty               #
 end
 
@@ -222,7 +222,7 @@ class Window_NameEdit < Window_Base
   MODO_NONE      = 0                      # なし
   MODE_FACE      = 1                      # 顔グラの描画
   MODE_CHARA     = 2                      # 歩行グラの描画
-  WORD_RANDNAME  = /^<RN:(.+?)>$/         # ランダムネームのキーワード取得
+  WORD_RANDNAME  = /^<RN:(.+?)>/          # ランダムネームのキーワード取得
   #--------------------------------------------------------------------------
   # ○ オブジェクト初期化
   #--------------------------------------------------------------------------
@@ -425,7 +425,7 @@ class Window_NameEdit < Window_Base
     src_rect.x = (actor.character_index % 4 * 3 + 1) * cw
     src_rect.y = (actor.character_index / 4 * 4) * ch
     if height != 0
-       y += (ch - height < 0) ? (ch - height) / 2 : ch - height
+      y += (ch - height < 0) ? (ch - height) / 2 : ch - height
     end
     self.contents.blt(x - cw / 2, y - ch, bitmap, src_rect)
   end
@@ -433,6 +433,7 @@ class Window_NameEdit < Window_Base
   # ● ランダムネームから
   #--------------------------------------------------------------------------
   def choose_name
+    p @actor.actor.note
     ward = @actor.actor.note[WORD_RANDNAME, 1]
     ward = @actor.class.note[WORD_RANDNAME, 1] unless ward
     if RANDOM_NAME[ward]
@@ -461,7 +462,7 @@ class Window_NameInput
   def initialize(edit_window)
     @edit_window = edit_window
     @page = 0         # 文字の種類
-    @category = 0     #
+    @category = 0
     @last_index = 0
 
     x = edit_window.x
@@ -498,7 +499,7 @@ class Window_NameInput
     self.index %= item_max if @index > 0
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● 文字テーブルの描画
   #--------------------------------------------------------------------------
   def draw_characters_table
     change_color(normal_color)
@@ -542,7 +543,7 @@ class Window_NameInput
     refresh
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● インデックスを戻す
   #--------------------------------------------------------------------------
   def restore_index
     @index = @last_index
@@ -600,7 +601,7 @@ class Window_NameInput
     Sound.play_cursor if @page != last_page
   end
   #--------------------------------------------------------------------------
-  # ●
+  # ● スーパークラスの処理を使用する
   #--------------------------------------------------------------------------
   remove_method :update_cursor      # カーソルの更新
   #--------------------------------------------------------------------------
@@ -764,10 +765,10 @@ class Window_NameCommand < Window_Selectable
   #--------------------------------------------------------------------------
   def draw_item(index)
     if COMMANDS[index][1]
-      change_color(normal_color)
       rect = item_rect(index)
       rect.x += 2
       rect.width -= 4
+      change_color(normal_color)
       draw_text(rect, COMMANDS[index][0], 1)
     end
   end
