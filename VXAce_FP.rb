@@ -1,5 +1,5 @@
 #==============================================================================
-# ■ VXAce_FP (RPGツクールVX Ace Fan Patch) 2015.03.17
+# ■ VXAce_FP (RPGツクールVX Ace Fan Patch) 2023.02.09
 #------------------------------------------------------------------------------
 #   RPGツクールVX Ace のプリセットスクリプトの不都合を修正します。
 #   不具合でなくとも問題のある処理は修正しています。
@@ -364,6 +364,16 @@ class Game_Player
 end
 class Game_Follower
   #--------------------------------------------------------------------------
+  # ● ジャンプ予約のキャンセル
+  #--------------------------------------------------------------------------
+  def cancel_jump
+    @jump_route = []
+    @jump_count = 0
+    update_bush_depth
+    @real_x = @x = $game_map.round_x(@x)
+    @real_y = @y = $game_map.round_y(@y)
+  end
+  #--------------------------------------------------------------------------
   # ● ジャンプの予約
   #--------------------------------------------------------------------------
   def reserve_jump(x, y, x_plus, y_plus)
@@ -391,8 +401,8 @@ class Game_Follower
   def chase_preceding_character
     return unless stopping?
     if jump_point?
-      jump(@jump_route.first[2], @jump_route.first[3])
-      @jump_route.shift
+      *, x_plus, y_plus = @jump_route.shift
+      jump(x_plus, y_plus)
     else
       if @preceding_character.reserved_jump_count < self.reserved_jump_count
         sx = distance_x_from(@jump_route.first[0])
@@ -409,6 +419,13 @@ class Game_Follower
         move_straight(sy > 0 ? 8 : 2)
       end
      end
+  end
+  #--------------------------------------------------------------------------
+  # ◎ 指定位置に移動 (プリセット未定義)
+  #--------------------------------------------------------------------------
+  def moveto(x, y)
+    super
+    cancel_jump
   end
 end
 class Game_Followers
