@@ -1,5 +1,5 @@
 #==============================================================================
-# ■ VXAce_FP (RPGツクールVX Ace Fan Patch) 2023.02.09
+# ■ VXAce_FP (RPGツクールVX Ace Fan Patch) 2025.01.21
 #------------------------------------------------------------------------------
 #   RPGツクールVX Ace のプリセットスクリプトの不都合を修正します。
 #   不具合でなくとも問題のある処理は修正しています。
@@ -452,18 +452,32 @@ class Sprite
 end
 
 # 18
-class Sprite_Picture
+class Game_Pictures
   #--------------------------------------------------------------------------
-  # ○ 解放
+  # ● 画像が指定されていないピクチャを削除する
   #--------------------------------------------------------------------------
-  alias _cao_sp_dispose dispose
-  def dispose
-    if @picture.name.empty?
-      screen = ($game_party.in_battle ? $game_troop : $game_map).screen
-      pictures = screen.instance_variable_get(:@pictures)
-      pictures.instance_variable_get(:@data)[@picture.number] = nil
-    end
-    _cao_sp_dispose
+  def clean
+    @data.map! {|picture| picture if picture && !picture.name.empty? }
+  end
+end
+class Spriteset_Map
+  #--------------------------------------------------------------------------
+  # ○ ピクチャスプライトの作成
+  #--------------------------------------------------------------------------
+  alias _cao_sp_create_pictures create_pictures
+  def create_pictures
+    $game_map.screen.instance_variable_get(:@pictures).clean
+    _cao_sp_create_pictures
+  end
+end
+class Spriteset_Battle
+  #--------------------------------------------------------------------------
+  # ○ ピクチャスプライトの作成
+  #--------------------------------------------------------------------------
+  alias _cao_sp_create_pictures create_pictures
+  def create_pictures
+    $game_troop.screen.instance_variable_get(:@pictures).clean
+    _cao_sp_create_pictures
   end
 end
 
