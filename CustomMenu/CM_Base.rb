@@ -3,7 +3,7 @@
 #    ＊ Custom Menu Base
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.1.6
+#    バージョン ： 1.1.7
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： https://cacaosoft.mars.jp/
@@ -559,7 +559,6 @@ class Scene_Menu
   # ● コマンド実行後の処理
   #--------------------------------------------------------------------------
   def post_terminate
-    item = current_console.current_data
     current_console.activate if !current_console.locked?
   end
   #--------------------------------------------------------------------------
@@ -2255,7 +2254,7 @@ class CAO::CM::Canvas
       change_color(system_color)
       draw_text(x, y, 32, line_height, Vocab::level_a)
     end
-    change_color(tp_color(actor))
+    change_color(normal_color)
     draw_text(x + width - 32, y, 32, line_height, actor.level, 2)
   end
   #--------------------------------------------------------------------------
