@@ -3,7 +3,7 @@
 #    ＊ 太縁取り
 #
 #  --------------------------------------------------------------------------
-#    バージョン ： 1.1.1
+#    バージョン ： 1.2.0
 #    対      応 ： RPGツクールVX Ace : RGSS3
 #    制  作  者 ： ＣＡＣＡＯ
 #    配  布  元 ： https://cacaosoft.mars.jp/
@@ -38,9 +38,14 @@ module CAO
     # ◇ 縁取り色の自動変更機能の有無を切り替えるスイッチの番号
     #--------------------------------------------------------------------------
     #     切り替えない場合は、0 としてください。常に ON となります。
-    #     自動で変更する場合は、文字色より暗い色になります。
+    #     ON の場合は、文字色より暗い色になります。
     #--------------------------------------------------------------------------
     SW_AUTO_COLOR = 0
+
+    #--------------------------------------------------------------------------
+    # ◇ 縁取りをさらに太くする
+    #--------------------------------------------------------------------------
+    OUTLINE_DOUBLE = false
 
     #--------------------------------------------------------------------------
     # ◇ 縁取りの色の濃さ (0-255)
@@ -69,6 +74,36 @@ module CAO
   #/////////////////////////////////////////////////////////////////////////////#
 
 
+  class Font
+    #--------------------------------------------------------------------------
+    # ● 別名定義
+    #--------------------------------------------------------------------------
+    alias _cao_border_color color= unless $!
+    #--------------------------------------------------------------------------
+    # 〇 フォントの色を設定
+    #--------------------------------------------------------------------------
+    def color=(c)
+      _cao_border_color(c)
+      if __auto_outcolor?
+        self.out_color.red   = self.color.red   / 3
+        self.out_color.green = self.color.green / 3
+        self.out_color.blue  = self.color.blue  / 3
+      end
+      if CAO::Border::OUTLINE_ALPHA != 0
+        self.out_color.alpha = CAO::Border::OUTLINE_ALPHA
+      end
+    end
+  private
+    #--------------------------------------------------------------------------
+    # ● 縁取り色を自動変更するか
+    #--------------------------------------------------------------------------
+    def __auto_outcolor?
+      return false unless self.outline
+      return true if CAO::Border::SW_AUTO_COLOR == 0
+      return $game_switches[CAO::Border::SW_AUTO_COLOR]
+    end
+  end
+
   class Bitmap
     #--------------------------------------------------------------------------
     # ● 別名定義
@@ -79,32 +114,14 @@ module CAO
     #--------------------------------------------------------------------------
     def draw_text(*args)
       if __bold_border?
-        last_shadow = self.font.shadow
-        self.font.shadow = false
         __draw_border_text(*__check_arg_draw_text(args))
-        self.font.shadow = last_shadow
       else
-        update_outcolor
         _cao_border_draw_text(*__check_arg_draw_text(args))
       end
     end
-    #--------------------------------------------------------------------------
-    # ●
-    #--------------------------------------------------------------------------
-    def update_outcolor
-      if __auto_outcolor?
-        self.font.out_color.red   = self.font.color.red   / 3
-        self.font.out_color.green = self.font.color.green / 3
-        self.font.out_color.blue  = self.font.color.blue  / 3
-      end
-      if CAO::Border::OUTLINE_ALPHA != 0
-        self.font.out_color.alpha = CAO::Border::OUTLINE_ALPHA
-      end
-    end
-
   private
     #--------------------------------------------------------------------------
-    # ●
+    # ● 縁取りを行うか
     #--------------------------------------------------------------------------
     def __bold_border?
       return false unless self.font.outline
@@ -112,15 +129,7 @@ module CAO
       return $game_switches[CAO::Border::SW_BOLD_BORDER]
     end
     #--------------------------------------------------------------------------
-    # ●
-    #--------------------------------------------------------------------------
-    def __auto_outcolor?
-      return false unless self.font.outline
-      return true if CAO::Border::SW_AUTO_COLOR == 0
-      return $game_switches[CAO::Border::SW_AUTO_COLOR]
-    end
-    #--------------------------------------------------------------------------
-    # ●
+    # ● draw_text の引数が正しいかチェック
     #--------------------------------------------------------------------------
     def __check_arg_draw_text(args)
       case args.size
@@ -158,29 +167,23 @@ module CAO
     def __draw_border_text(x, y, width, height, text, align)
       return if width <= 0 || height <= 0
 
+      last_shadow = self.font.shadow
+      self.font.shadow = false
+
       border = Bitmap.new(width, height)
       border.font = self.font.dup
-      if __auto_outcolor?
-        border.font.color.red /= 3
-        border.font.color.green /= 3
-        border.font.color.blue /= 3
-      else
-        border.font.color = border.font.out_color
-      end
-      border.font.out_color.set(0, 0, 0, 0)
+      border.font.color = border.font.out_color
+      border.font.outline = CAO::Border::OUTLINE_DOUBLE
+      border.font.out_color.set(border.font.color)
       border._cao_border_draw_text(0, 0, width, height, text, align)
 
       x += CAO::Border::POSITION[0]
       y += CAO::Border::POSITION[1]
-      if CAO::Border::OUTLINE_ALPHA == 0
-        alpha = Font.default_out_color.alpha
-      else
-        alpha = CAO::Border::OUTLINE_ALPHA
-      end
-      self.blt(x, y - 2, border, border.rect, alpha)
-      self.blt(x, y + 2, border, border.rect, alpha)
-      self.blt(x - 2, y, border, border.rect, alpha)
-      self.blt(x + 2, y, border, border.rect, alpha)
+      alpha = border.font.color.alpha
+      self.blt(x,     y - 2, border, border.rect, alpha)
+      self.blt(x,     y + 2, border, border.rect, alpha)
+      self.blt(x - 2, y,     border, border.rect, alpha)
+      self.blt(x + 2, y,     border, border.rect, alpha)
       self.blt(x - 1, y - 2, border, border.rect, alpha)
       self.blt(x + 1, y - 2, border, border.rect, alpha)
       self.blt(x - 1, y + 2, border, border.rect, alpha)
@@ -190,11 +193,14 @@ module CAO
       self.blt(x + 2, y - 1, border, border.rect, alpha)
       self.blt(x + 2, y + 1, border, border.rect, alpha)
 
-      last_out_color = self.font.out_color.dup
+      last_font = self.font.dup
+      self.font.outline = CAO::Border::OUTLINE_DOUBLE
       self.font.out_color.set(0, 0, 0, 0)
       _cao_border_draw_text(x, y, width, height, text, align)
-      self.font.out_color = last_out_color
+      self.font = last_font
 
       border.dispose
+
+      self.font.shadow = last_shadow
     end
   end
